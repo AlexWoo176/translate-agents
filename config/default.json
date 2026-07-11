@@ -1,0 +1,6 @@
+{
+  "BOOKS_ROOT": "../books",
+  "WEB_OUTPUT_ROOT": "../web-site",
+  "DEFAULT_TONE": "inspiring",
+  "DEFAULT_MODEL": "gemini-3.5-flash"
+}

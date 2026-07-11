@@ -1,0 +1,26 @@
+# Dependency directories
+**/node_modules/
+
+# Environment configurations (Contains sensitive API keys)
+.env
+.env.local
+.env.*.local
+
+# Python caches and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Project-specific temporary/trash directories (safe to ignore in Git)
+_Delete/
+scratch/
+
+# IDE and System files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.opencode/
+.gemini/
+.env

@@ -1,0 +1,7 @@
+{
+  "BOOKS_ROOT": "../books",
+  "WEB_OUTPUT_ROOT": "../web-site",
+  "ACTIVE_BOOKS": [
+    "entrepreneurship"
+  ]
+}

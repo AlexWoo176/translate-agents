@@ -1,0 +1,102 @@
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.6;
+  color: #333;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+  background-color: #fcfcfc;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: #111;
+  margin-top: 1.5em;
+}
+
+.os-figure, figure {
+  margin: 2rem 0;
+  text-align: center;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+
+.os-caption-container {
+  display: block;
+  font-size: 0.9em;
+  color: #666;
+  margin-top: 0.5rem;
+}
+
+.os-title-label, .os-number {
+  font-weight: bold;
+}
+
+.os-table table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+}
+
+.os-table th, .os-table td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: left;
+}
+
+.os-table th {
+  background-color: #f5f5f5;
+}
+
+[data-type="term"] {
+  font-weight: bold;
+  color: #0056b3;
+}
+
+dt {
+  font-weight: bold;
+}
+
+.learning-objectives {
+  background: #eef7ff;
+  padding: 1.5rem;
+  border-left: 4px solid #0056b3;
+  margin-bottom: 2rem;
+}
+
+.os-note-body {
+  background: #fff3cd;
+  padding: 1.5rem;
+  border-left: 4px solid #ffc107;
+  margin: 1.5rem 0;
+}
+
+/* Bilingual Presentation Utilities */
+.eng.hidden {
+  display: none !important;
+}
+
+/* Repaired: Ensure bilingual elements maintain natural rendering without breaking tables, lists, or inline structures */
+td.vn.visible, th.vn.visible {
+  display: table-cell !important;
+}
+tr.vn.visible {
+  display: table-row !important;
+}
+thead.vn.visible {
+  display: table-header-group !important;
+}
+tbody.vn.visible {
+  display: table-row-group !important;
+}
+table.vn.visible {
+  display: table !important;
+}
+li.vn.visible {
+  display: list-item !important;
+}
+
+

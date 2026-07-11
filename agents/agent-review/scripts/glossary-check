@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# glossary-check — Wrapper để chạy glossary-check.py từ bất kỳ đâu
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+exec python3 "$SCRIPT_DIR/glossary-check.py" "$@"
