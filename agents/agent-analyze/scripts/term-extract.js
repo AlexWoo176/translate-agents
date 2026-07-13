@@ -31,6 +31,24 @@ if (!PROJECT_ROOT) {
     process.exit(1);
 }
 
+function loadEnv() {
+    const envPath = path.join(PROJECT_ROOT, '.env');
+    const env = {};
+    if (fs.existsSync(envPath)) {
+        const content = fs.readFileSync(envPath, 'utf-8');
+        content.split(/\r?\n/).forEach(line => {
+            const trimmed = line.trim();
+            if (trimmed && !trimmed.startsWith('#')) {
+                const parts = trimmed.split('=');
+                if (parts.length >= 2) {
+                    env[parts[0].trim()] = parts.slice(1).join('=').trim();
+                }
+            }
+        });
+    }
+    return env;
+}
+
 const args = process.argv.slice(2);
 if (args.length < 2 || args[0] === '--help' || args[0] === '-h') {
     console.log(`Usage: node term-extract.js <book-name> <chapter-number>`);
@@ -40,11 +58,20 @@ if (args.length < 2 || args[0] === '--help' || args[0] === '-h') {
 const bookName = args[0];
 const chapterNum = args[1];
 
-let DATA_DIR = path.join(PROJECT_ROOT, '..', 'books', bookName);
+const env = loadEnv();
+const booksRoot = env.BOOKS_ROOT || path.join(PROJECT_ROOT, '..', 'books');
+let DATA_DIR = path.isAbsolute(booksRoot) ? path.join(booksRoot, bookName) : path.resolve(PROJECT_ROOT, booksRoot, bookName);
+
 if (!fs.existsSync(DATA_DIR)) {
-    DATA_DIR = path.join(PROJECT_ROOT, '..', bookName);
-    if (!fs.existsSync(DATA_DIR) && bookName === 'statistics') {
-        DATA_DIR = path.join(PROJECT_ROOT, '..', 'book-statistics');
+    // Fallback logic for original directories
+    let fallbackDir = path.join(PROJECT_ROOT, '..', bookName);
+    if (fs.existsSync(fallbackDir)) {
+        DATA_DIR = fallbackDir;
+    } else if (bookName === 'statistics') {
+        let statsDir = path.join(PROJECT_ROOT, '..', 'book-statistics');
+        if (fs.existsSync(statsDir)) {
+            DATA_DIR = statsDir;
+        }
     }
 }
 const GLOSSARY_FILE = path.join(DATA_DIR, 'glossary.csv');

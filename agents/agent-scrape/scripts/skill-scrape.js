@@ -12,8 +12,31 @@ if (!bookName || !startUrl) {
   process.exit(1);
 }
 
+const PROJECT_ROOT = path.resolve(__dirname, '../../..');
+
+function loadEnv() {
+  const envPath = path.join(PROJECT_ROOT, '.env');
+  const env = {};
+  if (fs.existsSync(envPath)) {
+    const content = fs.readFileSync(envPath, 'utf-8');
+    content.split(/\r?\n/).forEach(line => {
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith('#')) {
+        const parts = trimmed.split('=');
+        if (parts.length >= 2) {
+          env[parts[0].trim()] = parts.slice(1).join('=').trim();
+        }
+      }
+    });
+  }
+  return env;
+}
+
 const BOOK_URL = startUrl;
-const RAW_DIR = path.join(__dirname, '../../../data', bookName, 'raw');
+const env = loadEnv();
+const booksRoot = env.BOOKS_ROOT || path.join(PROJECT_ROOT, '..', 'books');
+const dataRoot = path.isAbsolute(booksRoot) ? path.join(booksRoot, bookName) : path.resolve(PROJECT_ROOT, booksRoot, bookName);
+const RAW_DIR = path.join(dataRoot, 'raw');
 
 if (!fs.existsSync(RAW_DIR)) {
   fs.mkdirSync(RAW_DIR, { recursive: true });

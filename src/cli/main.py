@@ -1,6 +1,6 @@
 import argparse
 import sys
-from src.cli.commands import status, validate, init_book, init_chapter, prep, translate, review, fix, archive, build, apply_css
+from src.cli.commands import status, validate, init_book, init_chapter, scrape, prep, translate, review, fix, archive, build, apply_css
 from src.cli.commands import verify_resources, qa_math, repair_encoding
 
 def main():
@@ -31,6 +31,13 @@ def main():
     init_chapter_parser.add_argument("--book", required=True, help="Book slug")
     init_chapter_parser.add_argument("--chapter", required=True, help="Chapter identifier")
     init_chapter_parser.add_argument("--force", action="store_true", help="Overwrite existing chapter files if set")
+
+    # scrape command
+    scrape_parser = subparsers.add_parser("scrape", help="Scrape book chapters recursively from OpenStax source")
+    scrape_parser.add_argument("--book", required=True, help="Book slug")
+    scrape_parser.add_argument("--chapter", required=True, help="Chapter identifier")
+    scrape_parser.add_argument("--start-url", help="Start URL to scrape from. If not specified, crawler will guess page 1")
+    scrape_parser.add_argument("--force", action="store_true", help="Overwrite existing raw HTML files if set")
 
     # prep command
     prep_parser = subparsers.add_parser("prep", help="Prepare bilingual HTML templates")
@@ -117,6 +124,8 @@ def main():
         sys.exit(init_book.run(args))
     elif args.command == "init-chapter":
         sys.exit(init_chapter.run(args))
+    elif args.command == "scrape":
+        sys.exit(scrape.run(args))
     elif args.command == "prep":
         sys.exit(prep.run(args))
     elif args.command == "translate":
