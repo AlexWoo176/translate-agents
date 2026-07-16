@@ -42,18 +42,23 @@ def get_book_root(book_slug: str) -> Path:
     """
     return get_books_root() / book_slug
 
+def get_chapter_folder_name(chapter) -> str:
+    """
+    Get the folder name of a specific chapter (e.g. chapter-1, _book-level).
+    """
+    chapter_str = str(chapter)
+    if chapter_str.startswith("chapter-"):
+        return chapter_str
+    elif chapter_str == "_book-level":
+        return chapter_str
+    else:
+        return f"chapter-{chapter_str}"
+
 def get_chapter_root(book_slug: str, chapter) -> Path:
     """
     Get root path of a specific chapter under a book.
     """
-    chapter_str = str(chapter)
-    if chapter_str.startswith("chapter-"):
-        folder_name = chapter_str
-    elif chapter_str == "_book-level":
-        folder_name = chapter_str
-    else:
-        folder_name = f"chapter-{chapter_str}"
-    return get_book_root(book_slug) / folder_name
+    return get_book_root(book_slug) / get_chapter_folder_name(chapter)
 
 def get_phase_dir(book_slug: str, chapter, phase: str) -> Path:
     """

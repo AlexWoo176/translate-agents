@@ -50,16 +50,17 @@ def run(args):
         print(f"  - Structural Integrity: {summary['integrity'].upper()}")
         print(f"  - Glossary Consistency: {summary['glossary'].upper()}")
         print(f"  - Math & Encoding Integrity: {summary['math_encoding'].upper()}")
+        print(f"  - Translation Quality QA: {summary['translation_qa'].upper()}")
         print(f"  - Review Gate Status: {summary['review_gate'].upper()}")
         print(f"\nGate report written to: {summary['gate_report']}")
 
         
         if exit_code == 0:
             update_status(book_slug, chapter, phase="review", status_str="completed", 
-                          extra_metadata={"checks": {"integrity": summary["integrity"], "glossary": summary["glossary"], "review_gate": summary["review_gate"]}})
+                          extra_metadata={"checks": {"integrity": summary["integrity"], "glossary": summary["glossary"], "translation_qa": summary["translation_qa"], "review_gate": summary["review_gate"]}})
         else:
             update_status(book_slug, chapter, phase="review", status_str="failed", error_msg="Review gate failed check(s)",
-                          extra_metadata={"checks": {"integrity": summary["integrity"], "glossary": summary["glossary"], "review_gate": summary["review_gate"]}})
+                          extra_metadata={"checks": {"integrity": summary["integrity"], "glossary": summary["glossary"], "translation_qa": summary["translation_qa"], "review_gate": summary["review_gate"]}})
         return exit_code
 
     check_type = getattr(args, "check", "integrity")

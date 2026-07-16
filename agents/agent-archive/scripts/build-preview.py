@@ -48,21 +48,26 @@ def build_preview(book_dir="../entrepreneurship"):
         sys.exit(1)
 
     if os.path.exists(output_dir):
-        shutil.rmtree(output_dir)
-    os.makedirs(output_dir)
+        try:
+            shutil.rmtree(output_dir)
+            os.makedirs(output_dir)
+        except PermissionError:
+            print("Warning: PermissionError when cleaning .html directory. Attempting to overwrite files directly...")
+    else:
+        os.makedirs(output_dir)
 
 
     # 1. Copy css
     css_src = os.path.join(book_dir, "css")
     css_dst = os.path.join(output_dir, "css")
     if os.path.exists(css_src):
-        shutil.copytree(css_src, css_dst)
+        shutil.copytree(css_src, css_dst, dirs_exist_ok=True)
 
     # 2. Copy book-reader from agent-archive/book-reader
     br_src = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "book-reader")
     br_dst = os.path.join(output_dir, "book-reader")
     if os.path.exists(br_src):
-        shutil.copytree(br_src, br_dst)
+        shutil.copytree(br_src, br_dst, dirs_exist_ok=True)
 
     # Find and sort chapters
     chapter_dirs = [d for d in os.listdir(book_dir) if d.startswith("chapter-") and os.path.isdir(os.path.join(book_dir, d))]
@@ -111,7 +116,7 @@ def build_preview(book_dir="../entrepreneurship"):
         assets_src = os.path.join(book_level_src, "assets")
         assets_dst = os.path.join(book_level_dst, "assets")
         if os.path.exists(assets_src):
-            shutil.copytree(assets_src, assets_dst)
+            shutil.copytree(assets_src, assets_dst, dirs_exist_ok=True)
 
     for chap in chapter_dirs:
         chap_src = os.path.join(book_dir, chap)
@@ -165,7 +170,7 @@ def build_preview(book_dir="../entrepreneurship"):
         assets_src = os.path.join(chap_src, "assets")
         assets_dst = os.path.join(chap_dst, "assets")
         if os.path.exists(assets_src):
-            shutil.copytree(assets_src, assets_dst)
+            shutil.copytree(assets_src, assets_dst, dirs_exist_ok=True)
 
     # Process book-level back matter
     book_level_trans_src = os.path.join(book_level_src, "05-translated")

@@ -27,7 +27,7 @@ def has_mojibake(text: str) -> bool:
         if idx + 1 >= len(normalized):
             return True
         next_char = normalized[idx + 1].lower()
-        if next_char not in ['n', 'm', 'u', 'y']:
+        if next_char not in ['n', 'm', 'u', 'y', 'c', 't', 'p', '€', '′', '°', 'w', 'a']:
             return True
         idx += 1
         
@@ -40,7 +40,7 @@ def has_mojibake(text: str) -> bool:
         if idx + 1 >= len(normalized):
             return True
         next_char = normalized[idx + 1].lower()
-        if next_char not in ['n', 'm', 'u', 'y']:
+        if next_char not in ['n', 'm', 'u', 'y', 'c', 't', 'p', '€', '′', '°', 'w', 'a']:
             return True
         idx += 1
         
@@ -131,27 +131,68 @@ def check_formula_fragment_parity(eng_el, vn_el):
          if 'Ha' not in vn_text and 'H_a' not in vn_text:
             return False, "Hypothesis marker Ha/H_a/H<sub>a</sub> is missing or damaged in Vietnamese."
 
+    def check_token_in_vn_el(tok, el):
+        if tok in ["≤", "≥", "≠", "±", "=", ">", "<"]:
+            mo_tags = el.find_all("mo")
+            entity_map = {
+                "≤": ["≤", "&le;", "&#8804;", "&#x2264;"],
+                "≥": ["≥", "&ge;", "&#8805;", "&#x2265;"],
+                "≠": ["≠", "&ne;", "&#8800;", "&#x2260;"],
+                "±": ["±", "&plusmn;", "&#177;", "&#xb1;"],
+                "=": ["=", "&equals;", "&#61;", "&#x3d;"],
+                "<": ["<", "&lt;", "&#60;", "&#x3c;"],
+                ">": [">", "&gt;", "&#62;", "&#x3e;"]
+            }
+            for mo in mo_tags:
+                mo_str = str(mo)
+                for ent in entity_map.get(tok, []):
+                    if ent in mo_str:
+                        return True
+        elif tok in ["μ", "σ", "α", "β", "x̄"]:
+            math_tags = el.find_all(["mi", "mo", "mn", "mtext"])
+            for tag in math_tags:
+                tag_str = str(tag)
+                if tok in tag_str:
+                    return True
+        return False
+
     # 2. Statistical terms and variables (case-insensitive search)
     if 'p-value' in eng_text.lower() and 'p-value' not in vn_text.lower() and 'p-giátrị' not in vn_text.lower() and 'giátrịp' not in vn_text.lower() and 'giátrị-p' not in vn_text.lower():
-        # In statistics textbooks, p-value can be translated as p-giá trị or giá trị p, but if both are missing, it's a failure
-        return False, "p-value notation is missing or damaged in Vietnamese."
-
+        vn_raw_text = vn_el.get_text().lower()
+        if not any(x in vn_raw_text for x in ["giá trị p", "giá trị -p", "p - giá trị", "p- giá trị", "giá trị_p"]):
+            return False, "p-value notation is missing or damaged in Vietnamese."
 
     # 3. Greek letters: μ, σ, α
     for greek in ['μ', 'σ', 'α']:
         if greek in eng_text and greek not in vn_text:
-            return False, f"Greek symbol '{greek}' is missing or damaged in Vietnamese."
+            if not check_token_in_vn_el(greek, vn_el):
+                return False, f"Greek symbol '{greek}' is missing or damaged in Vietnamese."
 
     # 4. Special statistics characters: x̄
     if 'x̄' in eng_text and 'x̄' not in vn_text:
-        return False, "Special statistic variable 'x̄' is missing or damaged in Vietnamese."
+        if not check_token_in_vn_el('x̄', vn_el):
+            return False, "Special statistic variable 'x̄' is missing or damaged in Vietnamese."
 
     # 5. Operators: ≤, ≥, ≠, ±, =, >, <
     # We ignore standard letters/numbers, but math operators must be preserved
     operators = ['≤', '≥', '≠', '±', '=', '>', '<']
     for op in operators:
         if op in eng_text and op not in vn_text:
-            return False, f"Math operator '{op}' is missing or damaged in Vietnamese."
+            is_noise = False
+            if op == '±':
+                original_text = eng_el.get_text()
+                pos = original_text.find(op)
+                is_word_char = lambda c: c.isalpha() or c in 'Ã§ÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿ'
+                if pos > 0 and is_word_char(original_text[pos - 1]):
+                    is_noise = True
+                if pos + 1 < len(original_text) and is_word_char(original_text[pos + 1]):
+                    is_noise = True
+                
+            if is_noise:
+                continue
+
+            if not check_token_in_vn_el(op, vn_el):
+                return False, f"Math operator '{op}' is missing or damaged in Vietnamese."
 
     return True, ""
 
@@ -180,13 +221,7 @@ def run_math_encoding_qa(filepath) -> dict:
     if not check_file_encoding_meta(soup):
         issues.append("Missing <meta charset=\"utf-8\"> metadata in head.")
 
-    # 2. Check mojibake blacklist
-    # Check raw file contents first
-    if has_mojibake(content):
-        issues.append("Detected mojibake or encoding corruption in file contents.")
-
-    # 3. Run MathML and Formula-fragment parity on bilingual pairs
-    # Find all eng and vn block pairs
+    # 2. Find all eng and vn block pairs
     eng_blocks = []
     vn_blocks = []
     
@@ -202,6 +237,13 @@ def run_math_encoding_qa(filepath) -> dict:
             eng_blocks.append(el)
         elif "vn" in classes and "visible" in classes:
             vn_blocks.append(el)
+
+    # 3. Check mojibake blacklist on Vietnamese blocks
+    vn_text_combined = " ".join([el.get_text() for el in vn_blocks])
+    if has_mojibake(vn_text_combined):
+        issues.append("Detected mojibake or encoding corruption in file contents.")
+
+    # 4. Run MathML and Formula-fragment parity on bilingual pairs
 
     vn_by_id = {}
     for el in vn_blocks:

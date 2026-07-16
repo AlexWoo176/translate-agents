@@ -2,16 +2,13 @@ import os
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from src.core.paths import get_book_root, get_chapter_root
+from src.core.paths import get_book_root, get_chapter_root, get_chapter_folder_name
 
 def normalize_chapter_key(chapter) -> str:
     """
-    Ensure chapter key is in 'chapter-N' format.
+    Ensure chapter key is in 'chapter-N' format (keeping _book-level as is).
     """
-    c_str = str(chapter)
-    if c_str.startswith("chapter-"):
-        return c_str
-    return f"chapter-{c_str}"
+    return get_chapter_folder_name(chapter)
 
 def update_status(book_slug: str, chapter=None, phase: str = None, status_str: str = "completed", error_msg: str = None, extra_metadata: dict = None):
     """

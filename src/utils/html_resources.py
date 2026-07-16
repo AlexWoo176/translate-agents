@@ -28,6 +28,27 @@ from typing import Optional
 from bs4 import BeautifulSoup, Tag
 
 # ---------------------------------------------------------------------------
+# Helpers for resource validation skipping
+# ---------------------------------------------------------------------------
+
+def should_skip_resource_tag(tag: Tag) -> bool:
+    """
+    Skip resource tag if inside comment/script/style/code/pre/template or eng hidden.
+    """
+    curr = tag
+    while curr and curr.name != '[document]':
+        if curr.name in ('script', 'style', 'code', 'pre', 'template'):
+            return True
+        # Check if inside eng hidden
+        classes = curr.get('class', [])
+        classes_list = [classes] if isinstance(classes, str) else classes
+        if 'eng' in classes_list and 'hidden' in classes_list:
+            return True
+        curr = curr.parent
+    return False
+
+
+# ---------------------------------------------------------------------------
 # Stage constants — canonical CSS href for each stage
 # ---------------------------------------------------------------------------
 
@@ -302,6 +323,8 @@ def validate_image_links(html_file: Path, assets_dir: Path) -> dict:
         return {"ok": False, "errors": [f"Parse error in {html_file}: {e}"]}
 
     for img in soup.find_all("img"):
+        if should_skip_resource_tag(img):
+            continue
         src = img.get("src", "")
         if not src:
             continue
@@ -467,8 +490,10 @@ def validate_image_src_pattern(html_file: Path, stage: str) -> dict:
         return {"ok": False, "errors": [f"Parse error in {html_file}: {e}"]}
 
     for img in soup.find_all("img"):
+        if should_skip_resource_tag(img):
+            continue
         src = img.get("src", "")
-        if not src or src.startswith("http://") or src.startswith("https://") or src.startswith("data:"):
+        if not src or src.startswith("http://") or src.startswith("https://") or src.startswith("data:") or src.startswith("mailto:") or src.startswith("doi:") or src.startswith("#"):
             continue
         if "assets/" not in src:
             continue  # Not an assets reference, skip

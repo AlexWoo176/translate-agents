@@ -54,9 +54,10 @@ def run(args):
         return 0
 
     # Guard: Ensure term extraction has been performed
-    from src.core.paths import get_book_root
+    from src.core.paths import get_book_root, get_chapter_folder_name
     book_path = get_book_root(book_slug)
-    new_glossary_path = book_path / f"chapter-{chapter}" / "03-analyzed" / f"chapter-{chapter}-new-glossary.csv"
+    chap_folder = get_chapter_folder_name(chapter)
+    new_glossary_path = book_path / chap_folder / "03-analyzed" / f"{chap_folder}-new-glossary.csv"
     if not new_glossary_path.is_file() and provider == "gemini-api" and not dry_run:
         print(f"WARNING: Glossary proposal file not found at: {new_glossary_path}")
         print(f"  It is highly recommended to run term extraction and review them before translating.")

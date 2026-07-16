@@ -29,6 +29,16 @@ import argparse
 from datetime import datetime
 
 
+def find_project_root():
+    """Walk up from this script to find project root (has 'package.json')."""
+    d = os.path.dirname(os.path.abspath(__file__))
+    for _ in range(10):
+        if os.path.exists(os.path.join(d, "package.json")):
+            return d
+        d = os.path.dirname(d)
+    return None
+
+
 PROJECT_ROOT = find_project_root()
 
 def load_env():
@@ -63,15 +73,18 @@ def load_glossary(csv_path):
     with open(csv_path, "r", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            key = row.get("key", "").strip().lower()
-            translation = row.get("translation", "").strip()
-            options_raw = row.get("options", "").strip()
+            key_raw = (row.get("key") or row.get("term") or "").strip()
+            key = key_raw.lower()
+            translation = (row.get("translation") or "").strip()
+            options_raw = (row.get("options") or "").strip()
             options = [o.strip().lower() for o in options_raw.split("/") if o.strip()]
-            if translation.lower() not in options:
-                options.insert(0, translation.lower())
+            for t in translation.split("/"):
+                t_clean = t.strip().lower()
+                if t_clean and t_clean not in options:
+                    options.append(t_clean)
             if key:
                 glossary[key] = {
-                    "key_raw": row.get("key", "").strip(),
+                    "key_raw": key_raw,
                     "translation": translation,
                     "options": options,
                 }

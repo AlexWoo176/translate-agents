@@ -39,6 +39,28 @@ def restore_structures(html_str, protected):
     """
     return restore_math_and_formulas(html_str, protected)
 
+def clean_extra_spans(original_html, translated_html):
+    try:
+        orig_soup = BeautifulSoup(original_html, 'html.parser')
+        trans_soup = BeautifulSoup(translated_html, 'html.parser')
+        
+        orig_span_ids = {tag.get('id') for tag in orig_soup.find_all('span') if tag.get('id')}
+        
+        changed = False
+        for tag in trans_soup.find_all('span'):
+            tid = tag.get('id')
+            if tid and tid not in orig_span_ids:
+                tag.unwrap()
+                changed = True
+                
+        if changed:
+            if hasattr(trans_soup, 'decode_contents'):
+                return trans_soup.decode_contents().strip()
+            return str(trans_soup).strip()
+    except Exception:
+        pass
+    return translated_html
+
 def validate_translation_integrity(original_inner_html, translated_inner_html):
     """
     Ensure no HTML structures or sensitive attributes were modified or removed.
@@ -84,6 +106,26 @@ def get_vn_blocks(soup):
                 classes = []
             if 'vn' in classes and 'visible' in classes:
                 vn_elements.append(tag)
+    # Also include div.os-caption-container
+    for tag in soup.find_all('div', class_='os-caption-container'):
+        classes = tag.get('class', [])
+        if isinstance(classes, str):
+            classes = classes.split()
+        elif classes is None:
+            classes = []
+        if 'vn' in classes and 'visible' in classes:
+            if tag not in vn_elements:
+                vn_elements.append(tag)
+    # Also include div elements with data-type="question-stem"
+    for tag in soup.find_all('div', attrs={"data-type": "question-stem"}):
+        classes = tag.get('class', [])
+        if isinstance(classes, str):
+            classes = classes.split()
+        elif classes is None:
+            classes = []
+        if 'vn' in classes and 'visible' in classes:
+            if tag not in vn_elements:
+                vn_elements.append(tag)
     return vn_elements
 
 def get_eng_blocks(soup):
@@ -97,6 +139,26 @@ def get_eng_blocks(soup):
             elif classes is None:
                 classes = []
             if 'eng' in classes and 'hidden' in classes:
+                eng_elements.append(tag)
+    # Also include div.os-caption-container
+    for tag in soup.find_all('div', class_='os-caption-container'):
+        classes = tag.get('class', [])
+        if isinstance(classes, str):
+            classes = classes.split()
+        elif classes is None:
+            classes = []
+        if 'eng' in classes and 'hidden' in classes:
+            if tag not in eng_elements:
+                eng_elements.append(tag)
+    # Also include div elements with data-type="question-stem"
+    for tag in soup.find_all('div', attrs={"data-type": "question-stem"}):
+        classes = tag.get('class', [])
+        if isinstance(classes, str):
+            classes = classes.split()
+        elif classes is None:
+            classes = []
+        if 'eng' in classes and 'hidden' in classes:
+            if tag not in eng_elements:
                 eng_elements.append(tag)
     return eng_elements
 
@@ -270,7 +332,20 @@ def call_gemini_api_for_items(items, glossary, analysis_notes, book_slug, chapte
         clean_json = clean_json[:-3]
     clean_json = clean_json.strip()
     
-    results = json.loads(clean_json)
+    def robust_json_loads(json_str: str):
+        try:
+            return json.loads(json_str)
+        except json.JSONDecodeError as orig_err:
+            cleaned = json_str.strip()
+            while cleaned.endswith(']') and len(cleaned) > 2:
+                cleaned = cleaned[:-1].strip()
+                try:
+                    return json.loads(cleaned)
+                except json.JSONDecodeError:
+                    pass
+            raise orig_err
+
+    results = robust_json_loads(clean_json)
     
     if not isinstance(results, list):
         raise ValueError("API response is not a JSON list")
@@ -336,7 +411,8 @@ def _translate_chapter_impl(book_slug, chapter, file_filter=None, force=False, r
             "2. Keep all inline tags (like <span>, <a>, <em>, <strong>, <sup>, <sub>, MathML tags like <math>, <mfrac>, <msub> etc.) and math placeholders like [[MATH_000001]] in their correct relative positions. Translate only the surrounding text and the text inside them. You must strictly preserve the exact tag structure and placeholders; do not add, omit, or modify any HTML tags or math placeholders.\n"
             "3. Use the provided glossary mapping. Translate matching terms exactly as specified.\n"
             "4. Tone: Use 'Bạn' for 'you' and 'Chúng ta' for 'we'. Ensure the Vietnamese flow is natural, grammatically correct, and matches academic standards.\n"
-            "5. Respond ONLY with a JSON array of objects, where each object has 'id' and 'translated_html'. Do not include any explanation or markdown formatting other than valid JSON."
+            "5. Respond ONLY with a JSON array of objects, where each object has 'id' and 'translated_html'. Do not include any explanation or markdown formatting other than valid JSON.\n"
+            "6. Localize standard document labels, such as translating 'Table' to 'Bảng' and 'Figure' to 'Hình' (e.g. 'Table 2.1' becomes 'Bảng 2.1', 'Figure 1.3' becomes 'Hình 1.3')."
         )
 
         for filename in html_files:
@@ -410,6 +486,7 @@ def _translate_chapter_impl(book_slug, chapter, file_filter=None, force=False, r
                         for item in batch:
                             translated_protected = ret_dict[item["id"]]
                             translated_restored = restore_structures(translated_protected, item["protected_tags"])
+                            translated_restored = clean_extra_spans(item["original_html"], translated_restored)
                             
                             # Validate HTML integrity
                             valid, err_msg = validate_translation_integrity(item["original_html"], translated_restored)
@@ -429,6 +506,7 @@ def _translate_chapter_impl(book_slug, chapter, file_filter=None, force=False, r
                                 ret_dict = call_gemini_api_for_items([item], glossary, analysis_notes, book_slug, chapter, system_instruction, model, api_key)
                                 translated_protected = ret_dict[item["id"]]
                                 translated_restored = restore_structures(translated_protected, item["protected_tags"])
+                                translated_restored = clean_extra_spans(item["original_html"], translated_restored)
                                 
                                 valid, err_msg = validate_translation_integrity(item["original_html"], translated_restored)
                                 if not valid:
@@ -443,6 +521,7 @@ def _translate_chapter_impl(book_slug, chapter, file_filter=None, force=False, r
                                     ret_dict = call_gemini_api_for_items([item], glossary, analysis_notes, book_slug, chapter, system_instruction, backup_model, api_key)
                                     translated_protected = ret_dict[item["id"]]
                                     translated_restored = restore_structures(translated_protected, item["protected_tags"])
+                                    translated_restored = clean_extra_spans(item["original_html"], translated_restored)
                                     
                                     valid, err_msg = validate_translation_integrity(item["original_html"], translated_restored)
                                     if not valid:

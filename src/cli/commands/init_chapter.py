@@ -1,6 +1,6 @@
 import os
 import json
-from src.core.paths import get_chapter_root, get_book_root
+from src.core.paths import get_chapter_root, get_book_root, get_chapter_folder_name
 
 def run(args):
     """
@@ -17,6 +17,7 @@ def run(args):
         chapter_val = args.chapter
 
     chapter_root = get_chapter_root(book_slug, args.chapter)
+
     print(f"Initializing chapter workspace at: {chapter_root}")
 
     # 1. Define list of nested subfolders to create
@@ -90,9 +91,7 @@ def run(args):
             return 1
 
     # 4. Update status.json of parent book
-    chapter_key = str(args.chapter)
-    if not chapter_key.startswith("chapter-"):
-        chapter_key = f"chapter-{chapter_key}"
+    chapter_key = get_chapter_folder_name(args.chapter)
 
     status_file = get_book_root(book_slug) / "status.json"
     if status_file.is_file():

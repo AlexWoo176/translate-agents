@@ -103,7 +103,7 @@ def main():
     parser = argparse.ArgumentParser(description="Repair English residue in translated files.")
     parser.add_argument("--book", default="introductory-statistics-2e", help="Book slug name")
     parser.add_argument("--chapter", default="1", help="Chapter identifier")
-    parser.add_argument("--model", default="gemini-2.5-flash", help="API Model name to use")
+    parser.add_argument("--model", default="gemini-3.1-flash-lite", help="API Model name to use")
     args = parser.parse_args()
 
     book_slug = args.book
@@ -187,24 +187,24 @@ def main():
                 else:
                     print("  -> Translation failed.")
 
-        # --- Part 2: Table caption / titles (os-caption-container) ---
-        caption_divs = soup.find_all('div', class_='os-caption-container')
+        # --- Part 2: Table/Figure caption / titles (os-caption-container) ---
+        caption_divs = soup.find_all(['div', 'figcaption'], class_='os-caption-container')
         for div_vn in caption_divs:
             classes = div_vn.get('class', [])
             if 'vn' in classes and 'visible' in classes:
                 # Find matching English sibling caption
-                div_eng = div_vn.find_previous_sibling('div', class_='os-caption-container')
+                div_eng = div_vn.find_previous_sibling(div_vn.name, class_='os-caption-container')
                 if div_eng and 'eng' in div_eng.get('class', []) and 'hidden' in div_eng.get('class', []):
-                    # Check os-title span inside
-                    span_vn = div_vn.find('span', class_='os-title')
-                    span_eng = div_eng.find('span', class_='os-title')
+                    # Check os-title or os-caption span inside
+                    span_vn = div_vn.find('span', class_=['os-title', 'os-caption'])
+                    span_eng = div_eng.find('span', class_=['os-title', 'os-caption'])
                     if span_vn and span_eng:
                         vn_title = span_vn.get_text().strip()
                         eng_title = span_eng.get_text().strip()
                         if detect_english_residue(vn_title) and vn_title == eng_title:
-                            print(f"[{f.name}] Detected untranslated table title:")
+                            print(f"[{f.name}] Detected untranslated table/figure title:")
                             print(f"  Title: {ascii(vn_title)}")
-                            print(f"  -> Translating table title...")
+                            print(f"  -> Translating table/figure title...")
                             translated = translate_block(eng_title, api_key, model=args.model)
                             if translated:
                                 print(f"  -> Translation received: {ascii(translated)}")
@@ -213,6 +213,17 @@ def main():
                                 repaired_count += 1
                             else:
                                 print("  -> Translation failed.")
+                    
+                    # Also localize label span (e.g., Table -> Bảng, Figure -> Hình)
+                    label_vn = div_vn.find('span', class_='os-title-label')
+                    if label_vn:
+                        lbl_text = label_vn.get_text()
+                        if "Table" in lbl_text:
+                            label_vn.string = lbl_text.replace("Table", "Bảng")
+                            file_modified = True
+                        elif "Figure" in lbl_text:
+                            label_vn.string = lbl_text.replace("Figure", "Hình")
+                            file_modified = True
 
         if file_modified:
             from src.utils.html_encoding import ensure_meta_charset_utf8

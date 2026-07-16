@@ -3,15 +3,14 @@ import time
 import requests
 from bs4 import BeautifulSoup
 from pathlib import Path
-from src.core.paths import get_book_root
+from src.core.paths import get_book_root, get_chapter_root
 
 def scrape_chapter(book_slug: str, chapter: str, start_url: str = None, force: bool = False) -> dict:
     """
     Recursively scrapes HTML pages of a chapter from OpenStax using next-link crawler.
     Saves raw files into chapter-{chapter}/01-raw/ under the book workspace directory.
     """
-    book_dir = get_book_root(book_slug)
-    raw_dir = book_dir / f"chapter-{chapter}" / "01-raw"
+    raw_dir = get_chapter_root(book_slug, chapter) / "01-raw"
     os.makedirs(raw_dir, exist_ok=True)
 
     headers = {
@@ -59,6 +58,7 @@ def scrape_chapter(book_slug: str, chapter: str, start_url: str = None, force: b
                 print(f"Downloading: {current_url}")
                 r = requests.get(current_url, headers=headers, timeout=20)
                 r.raise_for_status()
+                r.encoding = 'utf-8'
                 content = r.text
                 
                 with open(out_file, "w", encoding="utf-8") as f:

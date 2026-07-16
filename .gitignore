@@ -24,3 +24,10 @@ Thumbs.db
 .opencode/
 .gemini/
 .env
+
+# Local book data cache
+data/
+
+# Temporary run logs and output dumps
+*.log
+*_output.txt

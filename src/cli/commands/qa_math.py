@@ -1,7 +1,7 @@
 import os
 import sys
 from pathlib import Path
-from src.core.paths import get_book_root, get_translated_dir
+from src.core.paths import get_book_root, get_translated_dir, get_chapter_folder_name
 from src.qa.math_encoding_qa import run_math_encoding_qa
 
 def run(args):
@@ -19,7 +19,7 @@ def run(args):
 
     # Find chapters to check
     if chapter:
-        chapters = [f"chapter-{chapter}"]
+        chapters = [get_chapter_folder_name(chapter)]
     else:
         chapters = []
         for d in os.listdir(book_root):
@@ -37,11 +37,10 @@ def run(args):
     print(f"============================================================\n")
 
     for chap in chapters:
-        chap_num = chap.split("-")[1]
-        trans_dir = get_translated_dir(book_slug, chap_num)
+        trans_dir = get_translated_dir(book_slug, chap)
         
         if not trans_dir.is_dir():
-            print(f"Skipping chapter {chap_num} (translated folder not found)")
+            print(f"Skipping chapter {chap} (translated folder not found)")
             continue
 
         if file_name:

@@ -104,24 +104,53 @@ def run_review_gate(book_slug, chapter):
                 })
         math_encoding_status = "passed" if all_math_pass else "failed"
 
-    # 5. Determine overall Gate status
-    if integrity_status == "failed" or glossary_status == "failed" or math_encoding_status == "failed":
+    # 5. Run Translation Quality Checks
+    translation_qa_status = "pending"
+    translation_qa_failures = []
+    
+    if not has_clean or not translated_dir.is_dir():
+        translation_qa_status = "pending"
+    else:
+        from src.qa.translation_qa import check_file_translation_qa
+        all_trans_qa_pass = True
+        for fname in clean_files:
+            trans_path = translated_dir / fname
+            if not trans_path.is_file():
+                all_trans_qa_pass = False
+                translation_qa_failures.append({
+                    "file": fname,
+                    "issues": ["Missing translated file"]
+                })
+                continue
+            res = check_file_translation_qa(trans_path)
+            if res["status"] != "PASS":
+                all_trans_qa_pass = False
+                translation_qa_failures.append({
+                    "file": fname,
+                    "issues": res.get("issues", [])
+                })
+        translation_qa_status = "passed" if all_trans_qa_pass else "failed"
+
+    # 6. Determine overall Gate status
+    if (integrity_status == "failed" or glossary_status == "failed" or 
+        math_encoding_status == "failed" or translation_qa_status == "failed"):
         gate_status = "failed"
-    elif integrity_status == "pending" or glossary_status == "pending" or math_encoding_status == "pending":
+    elif (integrity_status == "pending" or glossary_status == "pending" or 
+          math_encoding_status == "pending" or translation_qa_status == "pending"):
         gate_status = "pending"
     else:
         gate_status = "passed"
 
-    # 6. Write chapter-N-review-gate.md
+    # 7. Write chapter-N-review-gate.md
     gate_report_path = reviews_dir / f"chapter-{chapter}-review-gate.md"
     write_gate_report(
         gate_report_path, book_slug, chapter, gate_status, 
-        integrity_status, glossary_status, math_encoding_status,
-        integrity_failures, glossary_failures, math_encoding_failures
+        integrity_status, glossary_status, math_encoding_status, translation_qa_status,
+        integrity_failures, glossary_failures, math_encoding_failures, translation_qa_failures
     )
 
-    # 7. Update chapter.json
-    update_chapter_json(chapter_json_path, integrity_status, glossary_status, math_encoding_status, gate_status)
+    # 8. Update chapter.json
+    update_chapter_json(chapter_json_path, integrity_status, glossary_status, math_encoding_status, translation_qa_status, gate_status)
 
     exit_code = 0 if gate_status == "passed" else 1
 
@@ -129,14 +158,15 @@ def run_review_gate(book_slug, chapter):
         "integrity": integrity_status,
         "glossary": glossary_status,
         "math_encoding": math_encoding_status,
+        "translation_qa": translation_qa_status,
         "review_gate": gate_status,
         "gate_report": gate_report_path
     }
 
 def write_gate_report(
     report_path, book_slug, chapter, gate_status, 
-    integrity_status, glossary_status, math_encoding_status,
-    integrity_failures, glossary_failures, math_encoding_failures
+    integrity_status, glossary_status, math_encoding_status, translation_qa_status,
+    integrity_failures, glossary_failures, math_encoding_failures, translation_qa_failures
 ):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
     
@@ -154,6 +184,7 @@ def write_gate_report(
         f"- **Structural Integrity:** {integrity_status.upper()}",
         f"- **Glossary Consistency:** {glossary_status.upper()}",
         f"- **Math & Encoding Integrity:** {math_encoding_status.upper()}",
+        f"- **Translation Quality QA:** {translation_qa_status.upper()}",
         "",
     ]
 
@@ -184,10 +215,19 @@ def write_gate_report(
                 lines.append(f"- {issue}")
             lines.append("")
 
+    if translation_qa_failures:
+        lines.append("## Translation Quality QA Failures Details")
+        lines.append("")
+        for f in translation_qa_failures:
+            lines.append(f"### File: `{f['file']}`")
+            for issue in f["issues"]:
+                lines.append(f"- {issue}")
+            lines.append("")
+
     with open(report_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
 
-def update_chapter_json(json_path, integrity_status, glossary_status, math_encoding_status, gate_status):
+def update_chapter_json(json_path, integrity_status, glossary_status, math_encoding_status, translation_qa_status, gate_status):
     if not json_path.is_file():
         chapter_data = {}
     else:
@@ -203,6 +243,7 @@ def update_chapter_json(json_path, integrity_status, glossary_status, math_encod
     chapter_data["qa"]["integrity"] = integrity_status
     chapter_data["qa"]["glossary"] = glossary_status
     chapter_data["qa"]["math_encoding"] = math_encoding_status
+    chapter_data["qa"]["translation_qa"] = translation_qa_status
     chapter_data["qa"]["review_gate"] = gate_status
 
     try:

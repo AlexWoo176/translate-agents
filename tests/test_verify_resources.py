@@ -108,6 +108,26 @@ def _build_book_fixture(root: Path, book_slug: str) -> dict:
         encoding="utf-8",
     )
 
+    # web-site
+    web_root = root / "web-site" / book_slug
+    web_css = web_root / "css"
+    web_css.mkdir(parents=True, exist_ok=True)
+    (web_css / "style.css").write_text("body{}", encoding="utf-8")
+    web_br = web_root / "book-reader"
+    web_br.mkdir(parents=True, exist_ok=True)
+    (web_br / "book-reader.css").write_text(".br{}", encoding="utf-8")
+    web_chap = web_root / "chapter-1"
+    web_assets = web_chap / "assets"
+    web_assets.mkdir(parents=True, exist_ok=True)
+    (web_assets / "img-1-1.webp").write_bytes(b"FAKE")
+    (web_chap / "1-1.html").write_text(
+        '<html><head>'
+        '<link rel="stylesheet" href="../css/style.css">'
+        '<link rel="stylesheet" href="../book-reader/book-reader.css">'
+        '</head><body><img src="assets/img-1-1.webp" alt="x"/></body></html>',
+        encoding="utf-8",
+    )
+
     return {"book_root": book_root, "chap": chap, "assets": assets, "arch_bil": arch_bil}
 
 
@@ -184,7 +204,7 @@ class TestVerifyResourcesFailures(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tmp)
 
-    def _run(self, chapter, stage):
+    def _run(self, chapter, stage, scope="all"):
         book_root = self.paths["book_root"]
         with patch("src.qa.resource_verifier.get_book_root", return_value=book_root), \
              patch("src.qa.resource_verifier.get_web_output_root", return_value=self.tmp / "web-site"), \
@@ -195,11 +215,11 @@ class TestVerifyResourcesFailures(unittest.TestCase):
                    }.get(p, p)), \
              patch("src.qa.resource_verifier.get_archive_dir",
                    side_effect=lambda b, c, m, f: book_root / f"chapter-{c}" / "07-archive" / m / f):
-            return verify_book_resources(self.book_slug, chapter=chapter, stage=stage)
+            return verify_book_resources(self.book_slug, chapter=chapter, stage=stage, scope=scope)
 
     def test_fails_missing_stylesheet_in_working(self):
         # Corrupt a working file by removing style.css link
-        html_file = self.paths["book_root"] / "chapter-1" / "02-clean" / "1-1.html"
+        html_file = self.paths["book_root"] / "chapter-1" / "05-translated" / "1-1.html"
         html_file.write_text("<html><head></head><body></body></html>", encoding="utf-8")
 
         exit_code, report = self._run("1", "working")
@@ -212,7 +232,7 @@ class TestVerifyResourcesFailures(unittest.TestCase):
 
     def test_fails_missing_image_file(self):
         # Reference a non-existent image
-        html_file = self.paths["book_root"] / "chapter-1" / "02-clean" / "1-1.html"
+        html_file = self.paths["book_root"] / "chapter-1" / "05-translated" / "1-1.html"
         html_file.write_text(
             '<html><head><link rel="stylesheet" href="../../css/style.css"></head>'
             '<body><img src="../assets/missing.webp" alt="x"/></body></html>',
@@ -257,7 +277,7 @@ class TestVerifyResourcesFailures(unittest.TestCase):
         self.assertTrue(any(str(arch_file) in k for k in report["errors"]))
 
     def test_fails_duplicate_style_links(self):
-        html_file = self.paths["book_root"] / "chapter-1" / "02-clean" / "1-1.html"
+        html_file = self.paths["book_root"] / "chapter-1" / "05-translated" / "1-1.html"
         html_file.write_text(
             '<html><head>'
             '<link rel="stylesheet" href="../../css/style.css">'
@@ -274,7 +294,7 @@ class TestVerifyResourcesFailures(unittest.TestCase):
 
     def test_error_messages_include_file_path(self):
         """All error messages must contain the affected file path."""
-        html_file = self.paths["book_root"] / "chapter-1" / "02-clean" / "1-1.html"
+        html_file = self.paths["book_root"] / "chapter-1" / "05-translated" / "1-1.html"
         html_file.write_text("<html><head></head><body></body></html>", encoding="utf-8")
 
         exit_code, report = self._run("1", "working")
@@ -329,3 +349,124 @@ class TestVerifyResourcesRawPolicy(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestVerifyResourcesScoping(unittest.TestCase):
+    """Tests for release vs all scoping in resource verifier."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.book_slug = "test-scope-book"
+        self.paths = _build_book_fixture(self.tmp, self.book_slug)
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp)
+
+    def _run(self, chapter, stage, scope="release"):
+        book_root = self.paths["book_root"]
+        with patch("src.qa.resource_verifier.get_book_root", return_value=book_root), \
+             patch("src.qa.resource_verifier.get_web_output_root", return_value=self.tmp / "web-site"), \
+             patch("src.qa.resource_verifier.get_phase_dir",
+                   side_effect=lambda b, c, p: book_root / f"chapter-{c}" / {
+                       "raw": "01-raw", "clean": "02-clean",
+                       "prep": "04-prep", "translated": "05-translated"
+                   }.get(p, p)), \
+             patch("src.qa.resource_verifier.get_archive_dir",
+                   side_effect=lambda b, c, m, f: book_root / f"chapter-{c}" / "07-archive" / m / f):
+            return verify_book_resources(self.book_slug, chapter=chapter, stage=stage, scope=scope)
+
+    def test_clean_missing_style_ignored_in_release_scope(self):
+        # Corrupt clean stage file
+        html_file = self.paths["book_root"] / "chapter-1" / "02-clean" / "1-1.html"
+        html_file.write_text("<html><head></head><body></body></html>", encoding="utf-8")
+
+        # In release scope, 02-clean is ignored by default
+        exit_code, report = self._run("1", None, scope="release")
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(report["total_errors"], 0)
+
+        # In all scope, 02-clean should warn but not fail
+        exit_code, report = self._run("1", None, scope="all")
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(report["total_errors"], 0)
+        self.assertGreater(report["total_warnings"], 0)
+
+    def test_translated_missing_style_fails_release_scope(self):
+        # Corrupt translated file
+        html_file = self.paths["book_root"] / "chapter-1" / "05-translated" / "1-1.html"
+        html_file.write_text("<html><head></head><body></body></html>", encoding="utf-8")
+
+        exit_code, report = self._run("1", None, scope="release")
+        self.assertEqual(exit_code, 1)
+        self.assertGreater(report["total_errors"], 0)
+
+    def test_archive_vn_only_broken_css_fails_release_scope(self):
+        arch_vn_file = self.paths["book_root"] / "chapter-1" / "07-archive" / "vn-only" / "html" / "1-1.html"
+        arch_vn_file.write_text("<html><head></head><body></body></html>", encoding="utf-8")
+
+        exit_code, report = self._run("1", None, scope="release")
+        self.assertEqual(exit_code, 1)
+
+    def test_preview_broken_image_fails_release_scope(self):
+        # Write HTML in preview with broken image link
+        preview_file = self.paths["book_root"] / ".html" / "chapter-1" / "1-1.html"
+        preview_file.write_text(
+            '<html><head><link rel="stylesheet" href="../css/style.css"></head>'
+            '<body><img src="assets/broken.webp" alt="x"/></body></html>',
+            encoding="utf-8"
+        )
+        exit_code, report = self._run("1", "preview", scope="release")
+        self.assertEqual(exit_code, 1)
+
+    def test_website_broken_image_fails_release_scope(self):
+        # Create web-site structure
+        web_root = self.tmp / "web-site" / self.book_slug
+        web_css = web_root / "css"
+        web_css.mkdir(parents=True, exist_ok=True)
+        (web_css / "style.css").write_text("body{}", encoding="utf-8")
+        web_br = web_root / "book-reader"
+        web_br.mkdir(parents=True, exist_ok=True)
+        (web_br / "book-reader.css").write_text(".br{}", encoding="utf-8")
+        
+        web_chap = web_root / "chapter-1"
+        web_assets = web_chap / "assets"
+        web_assets.mkdir(parents=True, exist_ok=True)
+        # Write HTML with broken image link
+        (web_chap / "1-1.html").write_text(
+            '<html><head><link rel="stylesheet" href="../css/style.css"></head>'
+            '<body><img src="assets/broken.webp" alt="x"/></body></html>',
+            encoding="utf-8"
+        )
+        exit_code, report = self._run("1", "web", scope="release")
+        self.assertEqual(exit_code, 1)
+
+    def test_external_and_data_uris_ignored(self):
+        # Write HTML with external and data URIs in translated
+        html_file = self.paths["book_root"] / "chapter-1" / "05-translated" / "1-1.html"
+        html_file.write_text(
+            '<html><head><link rel="stylesheet" href="../../css/style.css"></head>'
+            '<body>'
+            '<img src="https://openstax.org/logo.png" alt="x"/>'
+            '<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAUA" alt="y"/>'
+            '</body></html>',
+            encoding="utf-8"
+        )
+        exit_code, report = self._run("1", None, scope="release")
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(report["total_errors"], 0)
+
+    def test_hidden_eng_hidden_content_ignored(self):
+        # Write HTML with missing image inside eng hidden in translated
+        html_file = self.paths["book_root"] / "chapter-1" / "05-translated" / "1-1.html"
+        html_file.write_text(
+            '<html><head><link rel="stylesheet" href="../../css/style.css"></head>'
+            '<body>'
+            '<div class="eng hidden">'
+            '  <img src="../assets/missing-but-ignored.webp" alt="x"/>'
+            '</div>'
+            '</body></html>',
+            encoding="utf-8"
+        )
+        exit_code, report = self._run("1", None, scope="release")
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(report["total_errors"], 0)

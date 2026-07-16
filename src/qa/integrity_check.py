@@ -11,11 +11,21 @@ INLINE_TAGS = ["a", "span"]
 def is_leaf_block(tag):
     """
     Check if this tag is a BLOCK_TAG and contains no other nested BLOCK_TAG elements.
+    We ignore block tags that are nested inside container tags (like table or figure)
+    which are children of this tag.
     """
     if tag.name not in BLOCK_TAGS:
         return False
     for child in tag.find_all(BLOCK_TAGS):
-        return False
+        in_container = False
+        for parent in child.parents:
+            if parent is tag:
+                break
+            if parent.name in CONTAINER_TAGS:
+                in_container = True
+                break
+        if not in_container:
+            return False
     return True
 
 def analyze_file_tags(filepath):
@@ -76,9 +86,20 @@ def analyze_file_tags(filepath):
         vn_visible_counts[tag_name] = 0
 
     for el in eng_blocks:
-        eng_hidden_counts[el.name] = eng_hidden_counts.get(el.name, 0) + 1
+        if is_leaf_block(el):
+            eng_hidden_counts[el.name] = eng_hidden_counts.get(el.name, 0) + 1
+        else:
+            for child in el.find_all(BLOCK_TAGS):
+                if is_leaf_block(child):
+                    eng_hidden_counts[child.name] = eng_hidden_counts.get(child.name, 0) + 1
+
     for el in vn_blocks:
-        vn_visible_counts[el.name] = vn_visible_counts.get(el.name, 0) + 1
+        if is_leaf_block(el):
+            vn_visible_counts[el.name] = vn_visible_counts.get(el.name, 0) + 1
+        else:
+            for child in el.find_all(BLOCK_TAGS):
+                if is_leaf_block(child):
+                    vn_visible_counts[child.name] = vn_visible_counts.get(child.name, 0) + 1
 
     return {
         "content_empty": False,
@@ -189,6 +210,37 @@ def check_file_integrity(clean_path, trans_path):
                     f"Mismatched inline <{tag}> inside block ID '{eng_id_str}': "
                     f"English has {eng_inline_cnt}, Vietnamese has {vn_inline_cnt}"
                 )
+
+    # 4. Check for untranslated (English leak) blocks
+    soup = trans_stats["soup"]
+    for tag_name in BLOCK_TAGS:
+        for tag in soup.find_all(tag_name):
+            classes = tag.get('class', []) or []
+            if isinstance(classes, str):
+                classes = classes.split()
+            
+            if 'eng' not in classes and 'vn' not in classes:
+                # Check if any parent has eng or vn class
+                has_bilingual_parent = False
+                for parent in tag.parents:
+                    if parent is None or parent.name == '[document]':
+                        break
+                    p_classes = parent.get('class', []) or []
+                    if isinstance(p_classes, str):
+                        p_classes = p_classes.split()
+                    if 'eng' in p_classes or 'vn' in p_classes:
+                        has_bilingual_parent = True
+                        break
+                
+                if not has_bilingual_parent:
+                    # Ignore if the tag contains no meaningful text content
+                    text = tag.get_text(strip=True)
+                    if text:
+                        snippet = text[:60]
+                        tag_id = tag.get('id', '(no-id)')
+                        issues.append(
+                            f"English Leak: Untranslated block <{tag_name}> id='{tag_id}' found: \"{snippet}...\""
+                        )
 
     status = "FAIL" if issues else "PASS"
     

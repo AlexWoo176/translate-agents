@@ -58,13 +58,13 @@ def _accumulate(errors: dict, file_path: Path, new_errors: list[str]) -> None:
 
 
 def _run_validators(html_file: Path, stage: str, assets_dir: Optional[Path],
-                    errors: dict, warnings: dict) -> None:
+                    errors: dict, warnings: dict, phase: Optional[str] = None) -> None:
     """
     Run all applicable validators for a single HTML file and accumulate results.
     """
-    # CSS presence/correctness (skip for raw — report-only)
+    # CSS presence/correctness (skip or warn for raw, clean, prep)
     res = validate_stylesheet_links(html_file, stage)
-    if stage == "raw":
+    if stage == "raw" or phase in ("clean", "prep"):
         if not res["ok"]:
             key = str(html_file)
             warnings.setdefault(key, []).extend(res["errors"])
@@ -100,16 +100,21 @@ def _verify_raw(book_slug: str, chapter: str, errors: dict, warnings: dict) -> N
         _run_validators(html_file, "raw", None, errors, warnings)
 
 
-def _verify_working(book_slug: str, chapter: str, errors: dict, warnings: dict) -> None:
+def _verify_working(book_slug: str, chapter: str, errors: dict, warnings: dict, scope: str = "release") -> None:
     """Verify 02-clean, 04-prep, 05-translated working folders."""
     book_root = get_book_root(book_slug)
     chapter_str = f"chapter-{chapter}" if not str(chapter).startswith("chapter-") and str(chapter) != "_book-level" else str(chapter)
     assets_dir = book_root / chapter_str / "assets"
 
-    for phase in ("clean", "prep", "translated"):
+    if scope == "release":
+        phases = ("translated",)
+    else:
+        phases = ("clean", "prep", "translated")
+
+    for phase in phases:
         phase_dir = get_phase_dir(book_slug, chapter, phase)
         for html_file in _html_files(phase_dir):
-            _run_validators(html_file, "working", assets_dir, errors, warnings)
+            _run_validators(html_file, "working", assets_dir, errors, warnings, phase=phase)
 
 
 def _verify_archive(book_slug: str, chapter: str, errors: dict, warnings: dict) -> None:
@@ -215,6 +220,7 @@ def verify_book_resources(
     book_slug: str,
     chapter: Optional[str] = None,
     stage: Optional[str] = None,
+    scope: str = "release",
 ) -> tuple[int, dict]:
     """
     Verify all HTML resources for a book against the resource contract.
@@ -225,6 +231,8 @@ def verify_book_resources(
                  verification to that chapter only.
         stage: Optional stage filter. One of: raw, working, archive, preview, web.
                If None, all stages are checked.
+        scope: Verification scope. If 'release', scans only release stages (excluding
+               raw, clean, prep). If 'all', scans intermediate stages too.
 
     Returns:
         (exit_code, report)
@@ -257,18 +265,25 @@ def verify_book_resources(
 
     # Determine which stages to run
     run_all = stage is None
-    run_raw = run_all or stage == "raw"
-    run_working = run_all or stage == "working"
-    run_archive = run_all or stage == "archive"
-    run_preview = run_all or stage == "preview"
-    run_web = run_all or stage == "web"
+    if scope == "release":
+        run_raw = (stage == "raw")
+        run_working = run_all or stage == "working"
+        run_archive = run_all or stage == "archive"
+        run_preview = run_all or stage == "preview"
+        run_web = run_all or stage == "web"
+    else:
+        run_raw = run_all or stage == "raw"
+        run_working = run_all or stage == "working"
+        run_archive = run_all or stage == "archive"
+        run_preview = run_all or stage == "preview"
+        run_web = run_all or stage == "web"
 
     # Run chapter-level stage checks
     for chap in chapters:
         if run_raw:
             _verify_raw(book_slug, chap, errors, warnings)
         if run_working:
-            _verify_working(book_slug, chap, errors, warnings)
+            _verify_working(book_slug, chap, errors, warnings, scope=scope)
         if run_archive:
             _verify_archive(book_slug, chap, errors, warnings)
 
@@ -299,6 +314,7 @@ def verify_book_resources(
         "book_slug": book_slug,
         "chapter": chapter,
         "stage_filter": stage,
+        "scope": scope,
     }
 
     exit_code = 0 if total_errors == 0 else 1

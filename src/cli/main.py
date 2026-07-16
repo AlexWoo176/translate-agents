@@ -113,6 +113,7 @@ def main():
     verify_parser.add_argument("--chapter", help="Restrict verification to a specific chapter")
     verify_parser.add_argument("--stage", choices=["raw", "working", "archive", "preview", "web"], help="Restrict verification to a specific stage")
     verify_parser.add_argument("--all", action="store_true", help="Run all stage checks (default if no --stage given)")
+    verify_parser.add_argument("--scope", default="release", choices=["release", "all"], help="Verification scope (release: user-facing only; all: intermediate stages too)")
 
     args = parser.parse_args()
 

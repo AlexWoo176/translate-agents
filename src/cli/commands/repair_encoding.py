@@ -1,7 +1,7 @@
 import os
 import re
 from pathlib import Path
-from src.core.paths import get_book_root, get_chapter_root, get_phase_dir, get_web_output_root
+from src.core.paths import get_book_root, get_chapter_root, get_phase_dir, get_web_output_root, get_chapter_folder_name
 
 # Centralized Repair Mapping
 REPAIR_MAP = [
@@ -22,6 +22,7 @@ REPAIR_MAP = [
     ("â€™", "’"),
     ("\u00e2\u0080\u0099", "’"),
     ("â€œ", "“"),
+    ("\u00e2\u0089\u00b5", "”"),
     ("\u00e2\u0080\u009c", "“"),
     ("â€ ", "”"),
     ("â€ ", "”"),
@@ -52,6 +53,15 @@ REPAIR_MAP = [
     ("\u00e2\u0088\u00bc", "∼"),
     ("âˆ‘", "∑"),
     ("\u00e2\u0088\u0091", "∑"),
+    ("Ã³", "ó"),
+    ("Ã±", "ñ"),
+    ("Ã­", "í"),
+    ("Ã…", "Å"),
+    ("Ã¥", "å"),
+    ("Ã‰", "É"),
+    ("Ã¼", "ü"),
+    ("Ã“", "Ó"),
+    ("Å»", "Ż"),
 ]
 
 
@@ -125,11 +135,12 @@ def run(args):
             if dir_path.is_dir():
                 target_dirs.append(dir_path)
         # Also check .html preview stage of that chapter if exists
-        preview_chap_dir = book_root / ".html" / f"chapter-{chapter}"
+        chap_folder = get_chapter_folder_name(chapter)
+        preview_chap_dir = book_root / ".html" / chap_folder
         if preview_chap_dir.is_dir():
             target_dirs.append(preview_chap_dir)
         # Also check web-site folder of that chapter if exists
-        web_chap_dir = get_web_output_root() / book_slug / f"chapter-{chapter}"
+        web_chap_dir = get_web_output_root() / book_slug / chap_folder
         if web_chap_dir.is_dir():
             target_dirs.append(web_chap_dir)
 

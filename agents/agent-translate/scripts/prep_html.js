@@ -11,7 +11,7 @@ function prepFile(inFile, outFile) {
         $('head').append('\n<style>\n.eng.hidden { display: none; }\n.vn.visible { color: #000; }\n</style>\n');
     }
 
-    const tagsToDuplicate = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'li', 'caption', 'figcaption', 'th', 'td', 'div.os-caption-container'];
+    const tagsToDuplicate = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'li', 'caption', 'figcaption', 'th', 'td', 'div.os-caption-container', 'div[data-type="question-stem"]'];
 
     tagsToDuplicate.forEach(tagName => {
         $(tagName).each(function() {

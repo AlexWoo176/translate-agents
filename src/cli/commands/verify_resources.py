@@ -24,6 +24,7 @@ def run(args):
     chapter = getattr(args, "chapter", None)
     stage = getattr(args, "stage", None)
     run_all = getattr(args, "all", False)
+    scope = getattr(args, "scope", "release")
 
     # --all overrides any --stage filter
     if run_all:
@@ -31,13 +32,14 @@ def run(args):
 
     print(f"\n{'='*60}")
     print(f"  VERIFY RESOURCES: BOOK '{book_slug}'")
+    print(f"  Scope:        {scope}")
     if chapter:
-        print(f"  Chapter: {chapter}")
+        print(f"  Chapter:      {chapter}")
     if stage:
         print(f"  Stage filter: {stage}")
     print(f"{'='*60}\n")
 
-    exit_code, report = verify_book_resources(book_slug, chapter=chapter, stage=stage)
+    exit_code, report = verify_book_resources(book_slug, chapter=chapter, stage=stage, scope=scope)
 
     stages_str = ", ".join(report["stages_checked"]) if report["stages_checked"] else "none"
     print(f"Stages checked: {stages_str}")

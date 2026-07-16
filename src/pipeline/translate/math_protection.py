@@ -14,8 +14,11 @@ def is_math_em(em_element):
         return True
         
     # Greek letters
-    greek_letters = ['μ', 'σ', 'α', 'β', 'γ', 'δ', 'λ', 'θ', 'π', 'chi', 'χ', 'ρ', 'η', 'Σ']
+    greek_letters = ['μ', 'σ', 'α', 'β', 'γ', 'δ', 'λ', 'θ', 'π', 'χ', 'ρ', 'η', 'Σ']
     if any(g in text for g in greek_letters):
+        return True
+        
+    if re.search(r'\bchi\b', text, re.IGNORECASE):
         return True
         
     low_text = text.lower()

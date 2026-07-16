@@ -64,22 +64,45 @@ def prep_file(in_path, out_path):
             head.append(style)
 
     # Collect all elements to duplicate
-    targets = []
+    raw_targets = []
     for tag_name in TAGS_TO_DUPLICATE:
-        targets.extend(soup.find_all(tag_name))
+        raw_targets.extend(soup.find_all(tag_name))
     
     # Also find div elements with class "os-caption-container" (table captions)
     for tag in soup.find_all('div', class_='os-caption-container'):
-        if tag not in targets:
+        if tag not in raw_targets:
+            raw_targets.append(tag)
+
+    # Also find div elements with data-type="question-stem" (critical thinking / review questions)
+    for tag in soup.find_all('div', attrs={"data-type": "question-stem"}):
+        if tag not in raw_targets:
+            raw_targets.append(tag)
+
+    # Filter targets to keep only the outermost blocks
+    targets = []
+    for tag in raw_targets:
+        has_target_parent = False
+        for parent in tag.parents:
+            if parent in raw_targets:
+                has_target_parent = True
+                break
+        if not has_target_parent:
             targets.append(tag)
 
     for tag in targets:
-        # Check if this tag contains any nested child tag that is also in targets
+        # Check if this tag contains any nested child tag that is also in targets.
+        # We ignore caption elements (caption, figcaption, div.os-caption-container)
+        # from causing their parent block to be skipped.
         contains_child_block = False
         for child in tag.find_all(recursive=True):
             if child in targets:
-                contains_child_block = True
-                break
+                is_caption = (
+                    child.name in ['caption', 'figcaption'] or
+                    (child.name == 'div' and child.get('class') and 'os-caption-container' in child.get('class'))
+                )
+                if not is_caption:
+                    contains_child_block = True
+                    break
         
         if contains_child_block:
             continue  # Skip outer tags, letting leaf tags be duplicated

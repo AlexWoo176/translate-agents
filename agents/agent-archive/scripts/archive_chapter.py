@@ -21,6 +21,14 @@ def archive_chapter(chapter_num, book="entrepreneurship"):
         return
         
     book_dir = os.path.join(project_root, "data", book)
+    if not os.path.isdir(os.path.join(book_dir, f"chapter-{chapter_num}", "05-translated")):
+        fallback = os.path.abspath(os.path.join(project_root, "..", "books", book))
+        if os.path.isdir(os.path.join(fallback, f"chapter-{chapter_num}", "05-translated")):
+            book_dir = fallback
+        else:
+            fallback_sibling = os.path.abspath(os.path.join(project_root, "..", book))
+            if os.path.isdir(os.path.join(fallback_sibling, f"chapter-{chapter_num}", "05-translated")):
+                book_dir = fallback_sibling
     chap_dir = os.path.join(book_dir, f"chapter-{chapter_num}")
     trans_dir = os.path.join(chap_dir, "05-translated")
     

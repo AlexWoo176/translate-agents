@@ -35,7 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // 2. Fetch and parse Glossary
   let glossaryData = [];
-  const glossaryPath = '../../glossary.csv';
+  const glossaryPath = '../glossary.csv';
 
   function parseCSV(text) {
     const lines = text.split('\n').filter(line => line.trim() !== '');
@@ -97,11 +97,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (isEnMode) {
       document.body.classList.add('lang-swap');
       swapBtn.textContent = 'Swap to VN';
-      readingTitle.textContent = 'Vietnamese Translation';
+      if (readingTitle) readingTitle.textContent = 'Vietnamese Translation';
     } else {
       document.body.classList.remove('lang-swap');
       swapBtn.textContent = 'Swap to EN';
-      readingTitle.textContent = 'Original English';
+      if (readingTitle) readingTitle.textContent = 'Original English';
     }
     // Clear panels on swap
     engContentPanel.innerHTML = 'Hover over the text to see the translation here.';
@@ -116,26 +116,21 @@ document.addEventListener('DOMContentLoaded', () => {
     chapterFiles = window.BOOK_PAGES;
     const currentPath = window.location.pathname;
     currentIndex = chapterFiles.findIndex(page => {
-        const cleanPage = page.replace('../../', '');
-        return currentPath.endsWith(cleanPage);
+        let cleanPage = page.replace('.html', '');
+        // For Cloudflare index files, /index is stripped from the URL
+        if (cleanPage.endsWith('/index')) {
+            cleanPage = cleanPage.substring(0, cleanPage.length - 6);
+        }
+        let currentPathWithoutHtml = currentPath.replace('.html', '').replace(/\/$/, "");
+        if (currentPathWithoutHtml.endsWith('/index')) {
+            currentPathWithoutHtml = currentPathWithoutHtml.substring(0, currentPathWithoutHtml.length - 6);
+        }
+        return currentPathWithoutHtml === cleanPage || currentPathWithoutHtml.endsWith(cleanPage);
     });
   } else {
-    // Fallback for local testing without build script
-    chapterFiles = [
-      '1-introduction.html',
-      '1-1-entrepreneurship-today.html',
-      '1-2-entrepreneurial-vision-and-goals.html',
-      '1-3-the-entrepreneurial-mindset.html',
-      '1-key-terms.html',
-      '1-summary.html',
-      '1-review-questions.html',
-      '1-discussion-questions.html',
-      '1-case-questions.html',
-      '1-suggested-resources.html'
-    ];
-    const pathParts = window.location.pathname.split('/');
-    const currentFile = pathParts[pathParts.length - 1] || '1-introduction.html';
-    currentIndex = chapterFiles.indexOf(currentFile);
+    // Fallback if BOOK_PAGES is somehow missing
+    chapterFiles = [];
+    currentIndex = -1;
   }
   
   const prevBtn = document.getElementById('br-prev-btn');
@@ -149,7 +144,11 @@ document.addEventListener('DOMContentLoaded', () => {
   function navigateTo(url) {
     document.body.classList.add('br-fade-out');
     setTimeout(() => {
-      window.location.href = url;
+      let targetUrl = url;
+      if (targetUrl.startsWith('/')) {
+        targetUrl = '..' + targetUrl;
+      }
+      window.location.href = targetUrl;
     }, 150);
   }
 

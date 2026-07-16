@@ -41,3 +41,12 @@
 
 - Preserve the repo's append-only review history: semantic review files are round-based in `06-reviews`, created via `start-review-round.py` rather than overwritten.
 - For translation edits, keep `eng hidden` blocks untouched and only change `vn visible` content while preserving inline tags and IDs, per `book-reader/skills/skill-translate.md`.
+- Chủ động cập nhật tệp `scratch/session_checkpoint.md` song song với `task.md` ngay sau khi hoàn thành mỗi Milestone lớn của dự án, không đợi đến cuối phiên chat hoặc khi có yêu cầu từ bro.
+
+
+## Token Optimization Protocols
+
+- **Giao thức 1 (Đọc Code):** Chỉ dùng `grep_search` định vị dòng trước, sau đó dùng `view_file` kèm `StartLine` và `EndLine` giới hạn trong khoảng 30-50 dòng. Cấm đọc tệp lớn hơn 100 dòng trực tiếp từ đầu đến cuối.
+- **Giao thức 2 (Sửa Code):** Luôn dùng `replace_file_content` hoặc `multi_replace_file_content` để thay thế cục bộ (diff). Nghiêm cấm dùng `write_to_file` để ghi đè (Overwrite) lên các tệp mã nguồn hiện có.
+- **Giao thức 3 (Reset Phiên chat):** Khi cuộc hội thoại vượt quá 20 lượt tương tác, Agent bắt buộc phải tạo tệp tóm tắt tiến độ tại `scratch/session_checkpoint.md` và cung cấp prompt hướng dẫn Người dùng khởi động lại phiên chat mới để giải phóng bộ nhớ đệm (context window).
+
